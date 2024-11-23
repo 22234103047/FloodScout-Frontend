@@ -237,8 +237,6 @@ export default function Dashboard() {
                 <ArrowUp className="w-8 h-8" />
               </button>
               <button
-                onTouchStart={handleTouchStart(commands.RIGHT)}
-                onTouchEnd={handleTouchEnd}
                 onClick={() => sendCommand(commands.RIGHT)}
                 disabled={!isPowered}
                 className={`p-6 ${
