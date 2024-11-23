@@ -43,7 +43,19 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (isPowered) {
-      const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000');
+      const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000', {
+        withCredentials: true,
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        timeout: 10000
+      });
+
+      newSocket.on('connect_error', (error) => {
+        console.error('Connection error:', error);
+        setIsConnected(false);
+      });
 
       newSocket.on('connect', () => {
         setIsConnected(true);
