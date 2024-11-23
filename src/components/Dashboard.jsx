@@ -7,7 +7,6 @@ import LiveLocationModal from './LiveLocationModal';
 import Link from 'next/link';
 
 export default function Dashboard() {
-  // Individual states
   const [isPowered, setIsPowered] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [speed, setSpeed] = useState(0);
@@ -145,18 +144,6 @@ export default function Dashboard() {
     setVideoStream(null);
   };
 
-  // Add touch event handlers
-  const handleTouchStart = (command) => (e) => {
-    e.preventDefault();
-    sendCommand(command);
-  };
-
-  const handleTouchEnd = (e) => {
-    e.preventDefault();
-    if (direction === commands.FORWARD || direction === commands.BACKWARD) {
-      sendCommand(direction); // This will toggle off the current direction
-    }
-  };
 
   return (
     <div className="flex flex-col h-screen bg-gray-100 p-4 space-y-4">
@@ -237,8 +224,6 @@ export default function Dashboard() {
           <div className="flex-grow">
             <div className="grid grid-cols-2 gap-4 max-w-[300px] mx-auto">
               <button
-                onTouchStart={handleTouchStart(commands.FORWARD)}
-                onTouchEnd={handleTouchEnd}
                 onClick={() => sendCommand(commands.FORWARD)}
                 disabled={!isPowered}
                 className={`p-6 ${
@@ -265,8 +250,6 @@ export default function Dashboard() {
                 <ArrowRight className="w-8 h-8" />
               </button>
               <button
-                onTouchStart={handleTouchStart(commands.BACKWARD)}
-                onTouchEnd={handleTouchEnd}
                 onClick={() => sendCommand(commands.BACKWARD)}
                 disabled={!isPowered}
                 className={`p-6 ${
@@ -280,8 +263,6 @@ export default function Dashboard() {
                 <ArrowDown className="w-8 h-8" />
               </button>
               <button
-                onTouchStart={handleTouchStart(commands.LEFT)}
-                onTouchEnd={handleTouchEnd}
                 onClick={() => sendCommand(commands.LEFT)}
                 disabled={!isPowered}
                 className={`p-6 ${
