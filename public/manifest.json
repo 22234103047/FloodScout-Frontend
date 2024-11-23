@@ -8,7 +8,7 @@
     "theme_color": "#2563EB",
     "icons": [
       {
-        "src": "/icons/icon-512x512.png",
+        "src": "/FloodScout.png",
         "sizes": "512x512",
         "type": "image/png"
       }
