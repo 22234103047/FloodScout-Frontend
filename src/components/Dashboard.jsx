@@ -273,7 +273,7 @@ export default function Dashboard() {
             {/* Speed Control */}
             <div className="mt-6 max-w-[300px] mx-auto">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700">Speed Control</span>
+                <span className="text-sm font-medium text-gray-700">Speed</span>
                 <div className="flex items-center gap-2">
                   <button 
                     onClick={() => handleSpeedChange(Math.max(0, speed - 5))}
