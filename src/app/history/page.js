@@ -59,7 +59,7 @@ export default function HistoryPage() {
   return (
     <div className="bg-gray-300 w-full h-full p-4 min-h-screen relative pb-20">
       <h1 className="text-2xl font-bold text-foreground text-center">History</h1>
-      <div className="p-6 overflow-auto h-[calc(100vh-200px)]" onScroll={handleScroll}>
+      <div className="p-6" onScroll={handleScroll}>
         {loading ? (
           <div className="space-y-4">
             {[...Array(3)].map((_, i) => (

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, memo } from 'react';
 import { ref, get } from 'firebase/database';
 import { db } from '@/lib/firebase';
 
-const VideoCard = memo(({ isPowered }) => {
+const VideoCard = memo(({ isPowered, onStreamUpdate }) => {
   const [videoStream, setVideoStream] = useState(null);
 
   const fetchStreamData = useCallback(async () => {
@@ -17,11 +17,12 @@ const VideoCard = memo(({ isPowered }) => {
       
       if (streamData) {
         setVideoStream(streamData);
+        onStreamUpdate?.(streamData);
       }
     } catch (error) {
       console.error('Error fetching stream:', error);
     }
-  }, [isPowered]);
+  }, [isPowered, onStreamUpdate]);
 
   useEffect(() => {
     if (!isPowered) {

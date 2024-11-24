@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, History, Video, AlertTriangle, Power, MapPin } from 'lucide-react';
 import LiveLocationModal from './LiveLocationModal';
 import Link from 'next/link';
 import { ref, onValue, set, get } from 'firebase/database';
 import { db } from '@/lib/firebase';
 import VideoCard from './VideoCard';
+import { useToast } from "@/hooks/use-toast"
 
 export default function Dashboard() {
+  const { toast } = useToast();
+
   const [isPowered, setIsPowered] = useState(false);
   const [speed, setSpeed] = useState(0);
   const [forwardBackward, setForwardBackward] = useState(null);
@@ -18,6 +21,7 @@ export default function Dashboard() {
     longitude: null
   });
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [videoStream, setVideoStream] = useState(null);
 
   const commands = {
     FORWARD: 'FORWARD_MOVEMENT',
@@ -104,6 +108,10 @@ export default function Dashboard() {
           status: "pending",
           timestamp: Date.now()
         });
+        toast({
+          description: "Location saved to history",
+          variant: "success",
+        });
         break;
 
       case commands.GET_LOCATION:
@@ -138,6 +146,9 @@ export default function Dashboard() {
     });
   };
 
+  const handleStreamUpdate = useCallback((stream) => {
+    setVideoStream(stream);
+  }, []);
 
   return (
     <div className="flex flex-col h-screen bg-gray-100 p-4 space-y-4">
@@ -149,7 +160,10 @@ export default function Dashboard() {
       </header>
 
       {/* Video Feed */}
-      <VideoCard isPowered={isPowered} />
+      <VideoCard 
+        isPowered={isPowered} 
+        onStreamUpdate={handleStreamUpdate}
+      />
 
       {/* Boat Controls */}
       <div className="bg-gray-300 rounded-lg p-6">
