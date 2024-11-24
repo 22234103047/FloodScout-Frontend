@@ -1,6 +1,9 @@
+import { memo } from 'react';
 import Link from 'next/link';
+import { ref, update } from 'firebase/database';
+import { db } from '@/lib/firebase';
 
-export default function HistoryCard({ 
+const HistoryCard = memo(({ 
   missionNumber,
   date,
   latitude,
@@ -8,7 +11,27 @@ export default function HistoryCard({
   status,
   imageUrl,
   locationLink
-}) {
+}) => {
+  const handleStatusChange = (newStatus) => {
+    const missionRef = ref(db, `history/userLocations/${missionNumber}`);
+    update(missionRef, {
+      status: newStatus
+    });
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'In Progress':
+        return 'bg-blue-100 text-blue-800';
+      case 'Completed':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-4">
       <div className="flex justify-between items-center mb-4">
@@ -27,18 +50,30 @@ export default function HistoryCard({
         </div>
         <div className="flex items-center">
           <span className="text-gray-600 w-24">Status:</span>
-          <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-sm">
-            {status}
-          </span>
+          <select
+            value={status}
+            onChange={(e) => handleStatusChange(e.target.value)}
+            className={`appearance-none text-center ${getStatusColor(status)} border border-gray-300 py-2 px-4 pr-8 rounded-full leading-tight focus:outline-none`}
+          >
+            <option value="Pending">Pending</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Completed">Completed</option>
+          </select>
         </div>
       </div>
 
       <div className="w-full h-48 mb-4">
-        <img 
-          src={imageUrl} 
-          alt={`Rescue Mission ${missionNumber}`}
-          className="w-full h-full object-cover rounded-lg"
-        />
+        {imageUrl ? (
+          <img 
+            src={imageUrl} 
+            alt={`Rescue Mission ${missionNumber}`}
+            className="w-full h-full object-cover rounded-lg"
+          />
+        ) : (
+          <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
+            <span className="text-gray-500">No image available</span>
+          </div>
+        )}
       </div>
 
       <button className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700">
@@ -48,4 +83,7 @@ export default function HistoryCard({
       </button>
     </div>
   );
-}
+});
+
+HistoryCard.displayName = 'HistoryCard';
+export default HistoryCard;

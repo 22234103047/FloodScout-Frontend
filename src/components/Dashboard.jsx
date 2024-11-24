@@ -1,130 +1,123 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { io } from 'socket.io-client';
 import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, History, Video, AlertTriangle, Power, MapPin } from 'lucide-react';
 import LiveLocationModal from './LiveLocationModal';
 import Link from 'next/link';
+import { ref, onValue, set, get } from 'firebase/database';
+import { db } from '@/lib/firebase';
+import VideoCard from './VideoCard';
 
 export default function Dashboard() {
   const [isPowered, setIsPowered] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
   const [speed, setSpeed] = useState(0);
-  const [direction, setDirection] = useState(null);
+  const [forwardBackward, setForwardBackward] = useState(null);
+  const [leftRightStraight, setLeftRightStraight] = useState('STRAIGHT');
   const [location, setLocation] = useState({
     latitude: null,
     longitude: null
   });
-  const [videoStream, setVideoStream] = useState(null);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
-  const [socket, setSocket] = useState(null);
-  const videoRef = useRef(null);
 
   const commands = {
     FORWARD: 'FORWARD_MOVEMENT',
     BACKWARD: 'BACKWARD_MOVEMENT',
     LEFT: 'LEFT_MOVEMENT',
     RIGHT: 'RIGHT_MOVEMENT',
+    STRAIGHT: 'STRAIGHT',
     CHANGE_SPEED: 'CHANGE_SPEED',
     SAVE_LOCATION: 'SAVE_LOCATION',
     GET_LOCATION: 'GET_LOCATION',
-    POWER_TOGGLE: 'POWER_TOGGLE',
-    BOAT_STATE: 'BOAT_STATE',
-    VIDEO_STREAM: 'VIDEO_STREAM',
-    VIDEO_FRAME: 'VIDEO_FRAME'
+    STOP: 'STOP'
   };
 
-  const getBoatState = (socket) => {
-    socket.on(commands.BOAT_STATE, (boatState) => {
-      console.log('Boat state updated:', boatState);
+  const getBoatState = () => {
+    const boatStateRef = ref(db, 'boatState');
+      
+    const unsubscribe = onValue(boatStateRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setIsPowered(data.power);
+        setSpeed(data.speed);
+        setForwardBackward(data.forwardBackward);
+        setLeftRightStraight(data.leftRightStraight);
+        setLocation({
+          latitude: data.location.latitude,
+          longitude: data.location.longitude
+        });
+      }
     });
+    return unsubscribe;
   }
 
   useEffect(() => {
+    const unsubscribe = getBoatState();
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
     if (isPowered) {
-      const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000', {
-        withCredentials: true,
-        transports: ['websocket', 'polling'],
-        reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-        timeout: 10000
-      });
-
-      newSocket.on('connect_error', (error) => {
-        console.error('Connection error:', error);
-        setIsConnected(false);
-      });
-
-      newSocket.on('connect', () => {
-        setIsConnected(true);
-        console.log('Connected to server');
-        getBoatState(newSocket);
-      });
-
-      newSocket.emit(commands.POWER_TOGGLE, isPowered);
-      
-      newSocket.on('location', (data) => {
-        setLocation({
-          latitude: data.latitude,
-          longitude: data.longitude
-        });
-      });
-
-      newSocket.on('disconnect', () => {
-        setIsConnected(false);
-        console.log('Disconnected from server');
-        getBoatState(newSocket);
-      });
-
-      setSocket(newSocket);
+      const unsubscribe = getBoatState();
+      // Set initial power state
+      set(ref(db, 'boatState/power'), isPowered);
 
       return () => {
-        if (newSocket) {
-          newSocket.disconnect();
-          setIsConnected(false);
-          setSocket(null);
-        }
+        unsubscribe();
       };
     }
   }, [isPowered]);
 
-  useEffect(() => {
-    if (socket) {
-      socket.on(commands.VIDEO_STREAM, (frameData) => {
-        if (videoRef.current) {
-          setVideoStream(frameData);
-          videoRef.current.src = frameData;
-        }
-      });
 
-      return () => {
-        socket.off(commands.VIDEO_STREAM);
-      };
+  const sendCommand = (command, value = null) => {
+    if (!isPowered) return;
+
+    switch (command) {
+      case commands.FORWARD:
+      case commands.BACKWARD:
+        const newForwardBackward = forwardBackward === command ? commands.STOP : command;
+        const newSpeed = newForwardBackward === commands.STOP ? 0 : 35;
+        
+        setSpeed(newSpeed);
+        setForwardBackward(newForwardBackward);
+        set(ref(db, 'boatState/forwardBackward'), newForwardBackward);
+        set(ref(db, 'boatState/speed'), newSpeed);
+        break;
+
+      case commands.LEFT:
+      case commands.RIGHT:
+        const newLeftRightStraight = leftRightStraight === command ? commands.STRAIGHT : command;
+        setLeftRightStraight(newLeftRightStraight);
+        set(ref(db, 'boatState/leftRightStraight'), newLeftRightStraight);
+        break;
+
+      case commands.CHANGE_SPEED:
+        set(ref(db, 'boatState/speed'), value);
+        break;
+
+      case commands.SAVE_LOCATION:
+        set(ref(db, `history/userLocations/${Date.now()}`), {
+          image: videoStream ?? "",
+          latitude: location.latitude,
+          longitude: location.longitude,
+          status: "pending",
+          timestamp: Date.now()
+        });
+        break;
+
+      case commands.GET_LOCATION:
+        get(ref(db, 'boatState/location')).then((snapshot) => {
+          if (snapshot.exists()) {
+            setLocation(snapshot.val());
+          }
+        });
+        break;
+
+      default:
+        set(ref(db, 'boatState/direction'), command);
+        break;
     }
-  }, [socket]);
-
-  const sendCommand = (command, value=null) => {
-    if (!isConnected || !socket) return;
-
-    if (command === commands.FORWARD || command === commands.BACKWARD) {
-      const newDirection = direction === command ? null : command;
-      if (newDirection === null) {
-        setSpeed(0);
-      } else {
-        setSpeed(30);
-      }
-      setDirection(newDirection);
-      socket.emit(newDirection || 'STOP');
-    } else if (command === commands.SAVE_LOCATION) {
-      socket.emit(command, location);
-    } else if (command === commands.CHANGE_SPEED) {
-      socket.emit(command, value);
-    } else {
-      socket.emit(command);
-    }
-
-    getBoatState(socket);
   };
 
   const handleSpeedChange = (newSpeed) => {
@@ -134,14 +127,15 @@ export default function Dashboard() {
 
   const togglePower = () => {
     setIsPowered(!isPowered);
-    setSocket(null);
-    setDirection(null);
-    setSpeed(0);
-    setLocation({
+    set(ref(db, 'boatState/power'), false);
+    set(ref(db, 'boatState/forwardBackward'), commands.STOP);
+    set(ref(db, 'boatState/leftRightStraight'), commands.STRAIGHT);
+    set(ref(db, 'boatState/speed'), 0);
+    set(ref(db, 'boatState/stream'), null);
+    set(ref(db, 'boatState/location'), {
       latitude: 23.8103,
       longitude: 90.4125
     });
-    setVideoStream(null);
   };
 
 
@@ -155,22 +149,7 @@ export default function Dashboard() {
       </header>
 
       {/* Video Feed */}
-      <div className="bg-gray-300 rounded-lg p-4">
-        <h2 className="text-lg font-semibold mb-2 text-center">Live Video Stream</h2>
-        <div className="aspect-video bg-gray-900 rounded-lg overflow-hidden">
-          {videoStream ? (
-            <img 
-              ref={videoRef}
-              alt="Live feed" 
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-500">
-              No video feed available
-            </div>
-          )}
-        </div>
-      </div>
+      <VideoCard isPowered={isPowered} />
 
       {/* Boat Controls */}
       <div className="bg-gray-300 rounded-lg p-6">
@@ -197,7 +176,7 @@ export default function Dashboard() {
               } text-white rounded font-medium flex items-center justify-center gap-2`}
             >
               <AlertTriangle className="w-5 h-5" />
-              Human Found
+              Found
             </button>
             <button 
               onClick={() => setIsLocationModalOpen(true)}
@@ -209,7 +188,7 @@ export default function Dashboard() {
               } text-white rounded font-medium flex items-center justify-center gap-2`}
             >
               <MapPin className="w-5 h-5" />
-              Live Location
+              Location
             </button>
             <Link 
               href="/history" 
@@ -229,7 +208,7 @@ export default function Dashboard() {
                 className={`p-6 ${
                   !isPowered 
                     ? 'bg-gray-400 cursor-not-allowed opacity-50' 
-                    : direction === commands.FORWARD 
+                    : forwardBackward === commands.FORWARD 
                       ? 'bg-emerald-700 ring-2 ring-emerald-300' 
                       : 'bg-emerald-500 hover:bg-emerald-600'
                 } text-white rounded-lg flex items-center justify-center touch-none`}
@@ -242,7 +221,9 @@ export default function Dashboard() {
                 className={`p-6 ${
                   !isPowered 
                     ? 'bg-gray-400 cursor-not-allowed opacity-50' 
-                    : 'bg-gray-800 hover:bg-gray-900'
+                    : leftRightStraight === commands.RIGHT
+                      ? 'bg-gray-900 ring-2 ring-gray-300'
+                      : 'bg-gray-800 hover:bg-gray-900'
                 } text-white rounded-lg flex items-center justify-center touch-none`}
               >
                 <ArrowRight className="w-8 h-8" />
@@ -253,7 +234,7 @@ export default function Dashboard() {
                 className={`p-6 ${
                   !isPowered 
                     ? 'bg-gray-400 cursor-not-allowed opacity-50' 
-                    : direction === commands.BACKWARD 
+                    : forwardBackward === commands.BACKWARD 
                       ? 'bg-amber-700 ring-2 ring-amber-300' 
                       : 'bg-amber-500 hover:bg-amber-600'
                 } text-white rounded-lg flex items-center justify-center touch-none`}
@@ -266,7 +247,9 @@ export default function Dashboard() {
                 className={`p-6 ${
                   !isPowered 
                     ? 'bg-gray-400 cursor-not-allowed opacity-50' 
-                    : 'bg-cyan-500 hover:bg-cyan-600'
+                    : leftRightStraight === commands.LEFT
+                      ? 'bg-cyan-700 ring-2 ring-cyan-300'
+                      : 'bg-cyan-500 hover:bg-cyan-600'
                 } text-white rounded-lg flex items-center justify-center touch-none`}
               >
                 <ArrowLeft className="w-8 h-8" />
@@ -280,9 +263,9 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2">
                   <button 
                     onClick={() => handleSpeedChange(Math.max(0, speed - 5))}
-                    disabled={!isPowered || !(direction === commands.FORWARD || direction === commands.BACKWARD)}
+                    disabled={!isPowered || !(forwardBackward === commands.FORWARD || forwardBackward === commands.BACKWARD)}
                     className={`w-6 h-6 flex items-center justify-center ${
-                      !isPowered || !(direction === commands.FORWARD || direction === commands.BACKWARD)
+                      !isPowered || !(forwardBackward === commands.FORWARD || forwardBackward === commands.BACKWARD)
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
                         : 'bg-gray-200 hover:bg-gray-300'
                     } rounded`}
@@ -294,9 +277,9 @@ export default function Dashboard() {
                   </span>
                   <button 
                     onClick={() => handleSpeedChange(Math.min(100, speed + 5))}
-                    disabled={!isPowered || !(direction === commands.FORWARD || direction === commands.BACKWARD)}
+                    disabled={!isPowered || !(forwardBackward === commands.FORWARD || forwardBackward === commands.BACKWARD)}
                     className={`w-6 h-6 flex items-center justify-center ${
-                      !isPowered || !(direction === commands.FORWARD || direction === commands.BACKWARD)
+                      !isPowered || !(forwardBackward === commands.FORWARD || forwardBackward === commands.BACKWARD)
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
                         : 'bg-gray-200 hover:bg-gray-300'
                     } rounded`}
@@ -314,9 +297,9 @@ export default function Dashboard() {
                   const newSpeed = parseInt(e.target.value);
                   handleSpeedChange(newSpeed);
                 }}
-                disabled={!isPowered || !(direction === commands.FORWARD || direction === commands.BACKWARD)}
+                disabled={!isPowered || !(forwardBackward === commands.FORWARD || forwardBackward === commands.BACKWARD)}
                 className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${
-                  !isPowered || !(direction === commands.FORWARD || direction === commands.BACKWARD)
+                  !isPowered || !(forwardBackward === commands.FORWARD || forwardBackward === commands.BACKWARD)
                     ? 'bg-gray-200 opacity-50 cursor-not-allowed' 
                     : 'bg-gray-200 accent-blue-600'
                 }`}
@@ -334,9 +317,9 @@ export default function Dashboard() {
 
       {/* Connection Status */}
       <div className={`fixed bottom-4 right-4 px-3 py-1 rounded-full text-sm ${
-        isConnected ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+        isPowered ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
       }`}>
-        {isConnected ? 'Connected' : 'Disconnected'}
+        {isPowered ? 'Connected' : 'Disconnected'}
       </div>
 
       <LiveLocationModal
