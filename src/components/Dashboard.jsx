@@ -102,7 +102,7 @@ export default function Dashboard() {
 
       case commands.SAVE_LOCATION:
         set(ref(db, `history/userLocations/${Date.now()}`), {
-          image: videoStream ?? "",
+          image: videoStream ? `data:image/png;base64,${videoStream}` : "",
           latitude: location.latitude,
           longitude: location.longitude,
           status: "pending",
@@ -141,8 +141,8 @@ export default function Dashboard() {
     set(ref(db, 'boatState/speed'), 0);
     set(ref(db, 'boatState/stream'), null);
     set(ref(db, 'boatState/location'), {
-      latitude: 23.8103,
-      longitude: 90.4125
+      latitude: 23.811851,
+      longitude: 90.3545386
     });
   };
 
